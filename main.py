@@ -403,6 +403,46 @@ class BilibiliSearchDownloadTool(FunctionTool[AstrAgentContext]):
 
 
 @dataclass
+class BilibiliVideoSummaryTool(FunctionTool[AstrAgentContext]):
+    """B站视频总结工具（LLM）"""
+    name: str = "bilibili_video_summary"
+    description: str = (
+        "为当前会话总结指定的B站视频，效果与 /总结 命令一致。"
+        "video_input 支持 B站视频链接、b23短链、或 BV 号。"
+    )
+    parameters: dict = field(
+        default_factory=lambda: {
+            "type": "object",
+            "properties": {
+                "video_input": {
+                    "type": "string",
+                    "description": "待总结的视频输入：B站链接、b23短链或BV号",
+                }
+            },
+            "required": ["video_input"],
+        }
+    )
+    plugin_instance: object = None
+
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+        video_input = str(kwargs.get("video_input", "")).strip()
+        if not video_input:
+            return "错误：请提供 video_input（B站链接、b23短链或BV号）"
+
+        try:
+            event = context.context.event
+        except Exception as e:
+            logger.warning(f"[BilibiliVideoSummaryTool] 获取上下文失败: {e}")
+            return f"错误：获取会话上下文失败 - {e}"
+
+        if not self.plugin_instance._check_access(event):
+            return "⛔ 当前会话无权限使用总结功能"
+
+        result = await self.plugin_instance._tool_generate_summary(video_input)
+        return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@dataclass
 class BilibiliSubscriptionAddTool(FunctionTool[AstrAgentContext]):
     """B站订阅添加工具（LLM）"""
     name: str = "bilibili_subscription_add"
@@ -623,18 +663,20 @@ class BiliVideoPlugin(Star):
         # 注册 AI 工具
         self._search_list_tool = BilibiliSearchListTool(plugin_instance=self)
         self._search_download_tool = BilibiliSearchDownloadTool(plugin_instance=self)
+        self._video_summary_tool = BilibiliVideoSummaryTool(plugin_instance=self)
         self._subscription_add_tool = BilibiliSubscriptionAddTool(plugin_instance=self)
         self._subscription_remove_tool = BilibiliSubscriptionRemoveTool(plugin_instance=self)
         self._subscription_list_tool = BilibiliSubscriptionListTool(plugin_instance=self)
         self._subscription_check_tool = BilibiliSubscriptionCheckTool(plugin_instance=self)
         self.context.add_llm_tools(self._search_list_tool)
         self.context.add_llm_tools(self._search_download_tool)
+        self.context.add_llm_tools(self._video_summary_tool)
         self.context.add_llm_tools(self._subscription_add_tool)
         self.context.add_llm_tools(self._subscription_remove_tool)
         self.context.add_llm_tools(self._subscription_list_tool)
         self.context.add_llm_tools(self._subscription_check_tool)
         self._log(
-            "已注册 bilibili_search_list / bilibili_search_download / "
+            "已注册 bilibili_search_list / bilibili_search_download / bilibili_video_summary / "
             "bilibili_subscription_add / bilibili_subscription_remove / "
             "bilibili_subscription_list / bilibili_subscription_check_updates 工具供 AI 调用"
         )
@@ -876,6 +918,97 @@ class BiliVideoPlugin(Star):
             "new_videos_count": len(new_videos),
             "new_videos": new_videos,
             "message": "检查完成，所有订阅的UP主暂无新视频" if not new_videos else f"检查完成，共发现 {len(new_videos)} 个新视频",
+        }
+
+    def _extract_summary_video_url(self, raw_msg: str, full_text: str = "") -> str:
+        """复用 /总结 的视频链接提取逻辑"""
+        raw_msg = raw_msg or ""
+        full_text = full_text or raw_msg
+        video_url = ""
+
+        args = self._parse_args(raw_msg)
+        if args:
+            first_arg = args.split()[0]
+            if 'bilibili.com' in first_arg or 'b23.tv' in first_arg:
+                video_url = first_arg
+
+        if not video_url:
+            url_match = re.search(
+                r'https?://(?:www\.)?bilibili\.com/video/[A-Za-z0-9/?=&_.]+',
+                raw_msg
+            )
+            if url_match:
+                video_url = url_match.group(0)
+
+        if not video_url and full_text != raw_msg:
+            url_match = re.search(
+                r'https?://(?:www\.)?bilibili\.com/video/[A-Za-z0-9/?=&_.]+',
+                full_text
+            )
+            if url_match:
+                video_url = url_match.group(0)
+
+        if not video_url:
+            for text_src in [raw_msg, full_text]:
+                short_match = re.search(r'https?://b23\.tv/\S+', text_src)
+                if short_match:
+                    video_url = short_match.group(0)
+                    break
+
+        if not video_url:
+            bv_match = re.search(r'(BV[0-9A-Za-z]{10})', raw_msg + " " + full_text)
+            if bv_match:
+                video_url = f"https://www.bilibili.com/video/{bv_match.group(1)}"
+
+        return video_url.rstrip('>') if video_url else ""
+
+    async def _build_summary_output(self, video_url: str) -> dict:
+        """复用 /总结 的总结生成与渲染逻辑"""
+        note = await self._generate_note(video_url)
+        rendered = self._render_and_get_chain(note)
+        return {
+            "video_url": video_url,
+            "note": note,
+            "rendered": rendered,
+            "render_mode": "image" if isinstance(rendered, list) else "text",
+        }
+
+    async def _tool_generate_summary(self, video_input: str) -> dict:
+        """LLM 工具：视频总结（底层复用 /总结 逻辑）"""
+        video_input = str(video_input or "").strip()
+        if not video_input:
+            return {
+                "ok": False,
+                "code": "invalid_video_input",
+                "message": "请提供 video_input（B站链接、b23短链或BV号）",
+            }
+
+        raw_msg = f"/总结 {video_input}"
+        video_url = self._extract_summary_video_url(raw_msg, video_input)
+        if not video_url:
+            return {
+                "ok": False,
+                "code": "video_url_not_found",
+                "message": "无法识别视频链接，请提供B站链接、b23短链或BV号",
+                "video_input": video_input,
+            }
+
+        if detect_platform(video_url) != "bilibili":
+            return {
+                "ok": False,
+                "code": "unsupported_platform",
+                "message": "目前仅支持B站视频链接",
+                "video_url": video_url,
+            }
+
+        output = await self._build_summary_output(video_url)
+        return {
+            "ok": True,
+            "code": "summary_generated",
+            "message": "视频总结生成完成",
+            "video_url": output["video_url"],
+            "render_mode": output["render_mode"],
+            "summary": output["note"],
         }
 
     def _check_access(self, event: AstrMessageEvent) -> bool:
@@ -1417,7 +1550,6 @@ class BiliVideoPlugin(Star):
             return
 
         # 从消息中提取 URL
-        import re
         raw_msg = event.message_str or ""
         self._log(f"[总结命令] event.message_str = '{raw_msg}'")
         self._log(f"[总结命令] event.message_str type = {type(raw_msg)}")
@@ -1446,62 +1578,7 @@ class BiliVideoPlugin(Star):
 
         logger.info(f"总结命令收到消息: {raw_msg}")
 
-        video_url = ""
-
-        # 方式1: 从命令参数中取
-        args = self._parse_args(raw_msg)
-        self._log(f"[总结命令] 方式1 _parse_args 结果: '{args}'")
-        if args:
-            # 尝试直接取第一个参数作为URL
-            first_arg = args.split()[0]
-            self._log(f"[总结命令] 方式1 第一个参数: '{first_arg}'")
-            if 'bilibili.com' in first_arg or 'b23.tv' in first_arg:
-                video_url = first_arg
-                self._log(f"[总结命令] 方式1 命中URL: '{video_url}'")
-
-        # 方式2: 用正则从 raw_msg 中找 bilibili URL
-        if not video_url:
-            url_match = re.search(
-                r'https?://(?:www\.)?bilibili\.com/video/[A-Za-z0-9/?=&_.]+',
-                raw_msg
-            )
-            if url_match:
-                video_url = url_match.group(0)
-                self._log(f"[总结命令] 方式2 从raw_msg正则匹配: '{video_url}'")
-            else:
-                self._log("[总结命令] 方式2 raw_msg中未匹配到bilibili URL")
-
-        # 方式3: 从 full_text (message_obj) 中找
-        if not video_url and full_text != raw_msg:
-            url_match = re.search(
-                r'https?://(?:www\.)?bilibili\.com/video/[A-Za-z0-9/?=&_.]+',
-                full_text
-            )
-            if url_match:
-                video_url = url_match.group(0)
-                self._log(f"[总结命令] 方式3 从full_text正则匹配: '{video_url}'")
-            else:
-                self._log("[总结命令] 方式3 full_text中未匹配到bilibili URL")
-
-        # 方式4: 找 b23.tv 短链
-        if not video_url:
-            for text_src in [raw_msg, full_text]:
-                short_match = re.search(r'https?://b23\.tv/\S+', text_src)
-                if short_match:
-                    video_url = short_match.group(0)
-                    self._log(f"[总结命令] 方式4 短链匹配: '{video_url}'")
-                    break
-            if not video_url:
-                self._log("[总结命令] 方式4 未匹配到 b23.tv 短链")
-
-        # 方式5: 尝试从整条消息中找 BV 号
-        if not video_url:
-            bv_match = re.search(r'(BV[0-9A-Za-z]{10})', raw_msg + " " + full_text)
-            if bv_match:
-                video_url = f"https://www.bilibili.com/video/{bv_match.group(1)}"
-                self._log(f"[总结命令] 方式5 从BV号构建URL: '{video_url}'")
-            else:
-                self._log("[总结命令] 方式5 未找到BV号")
+        video_url = self._extract_summary_video_url(raw_msg, full_text)
 
         if not video_url:
             self._log("[总结命令] 所有方式均未提取到URL, 返回错误")
@@ -1512,7 +1589,6 @@ class BiliVideoPlugin(Star):
             )
             return
 
-        video_url = video_url.rstrip('>')
         platform = detect_platform(video_url)
         self._log(f"[总结命令] 最终URL='{video_url}', platform='{platform}'")
         if platform != "bilibili":
@@ -1522,13 +1598,12 @@ class BiliVideoPlugin(Star):
 
         yield event.plain_result("⏳ 正在生成总结，请稍候（可能需要1-3分钟）...")
 
-        self._log(f"[总结命令] 调用 _generate_note: {video_url}")
-        note = await self._generate_note(video_url)
+        self._log(f"[总结命令] 调用 _build_summary_output: {video_url}")
+        output = await self._build_summary_output(video_url)
+        note = output["note"]
+        result = output["rendered"]
         self._log(f"[总结命令] 总结生成完成, 长度={len(note) if note else 0}")
-
-        # 发送总结（图片或文本）
-        result = self._render_and_get_chain(note)
-        self._log(f"[总结命令] 输出模式: {'图片' if isinstance(result, list) else '文本'}")
+        self._log(f"[总结命令] 输出模式: {'图片' if output['render_mode'] == 'image' else '文本'}")
         self._log("═══════ [总结命令] 结束(成功) ═══════")
         if isinstance(result, list):
             yield event.chain_result(result)

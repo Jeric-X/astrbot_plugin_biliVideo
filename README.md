@@ -145,14 +145,16 @@ apt install -y wkhtmltopdf
 用户: 帮我搜索 Python 教程视频
 用户: 从搜索结果里下载播放量最高的 3 个视频并总结
 用户: 搜索鸣潮相关的视频，告诉我漂泊者做了什么
+用户: 帮我总结这个视频 https://www.bilibili.com/video/BV1xx411c7mD
 ```
 
 ### 工作流程
 
-AI 会自动组合使用两个工具：
+AI 会自动组合使用工具：
 
 1. **bilibili_search_list**: 搜索视频并返回列表（包含BV号）
 2. **bilibili_search_download**: 根据BV号下载转写视频内容
+3. **bilibili_video_summary**: 直接总结指定视频（链接 / 短链 / BV号）
 
 转写完成后 AI 自动继续处理用户需求，转写文件保存在 `/AstrBot/data/plugin_data/astrbot_plugin_bilivideo/search_results/`
 
@@ -337,14 +339,16 @@ Search Bilibili videos, understand video content, and engage in deep conversatio
 User: Search for Python tutorial videos
 User: Download the top 3 videos by views and summarize them
 User: Search videos about Genshin Impact, tell me what the traveler did
+User: Summarize this video https://www.bilibili.com/video/BV1xx411c7mD
 ```
 
 ### How It Works
 
-AI combines two tools automatically:
+AI combines tools automatically:
 
 1. **bilibili_search_list**: Search videos and return list (with BV IDs)
 2. **bilibili_search_download**: Download and transcribe video content by BV IDs
+3. **bilibili_video_summary**: Summarize a specific video directly (link / short link / BV ID)
 
 AI automatically continues processing when transcription is done. Transcripts saved to `/AstrBot/data/plugin_data/astrbot_plugin_bilivideo/search_results/`
 
