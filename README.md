@@ -164,6 +164,24 @@ AI 会自动组合使用两个工具：
 | `default_download_count` | `3` | 建议每次下载转写的数量 |
 | `search_max_concurrent` | `1` | 同时下载转写的并发数 |
 
+## 🤖 AI 智能订阅
+
+除了命令式命令，你还可以直接告诉 AI 你想“订阅谁、取消谁、查看订阅列表”，AI 会自动调用对应工具帮你完成。
+
+### 支持能力
+
+- 添加订阅（`bilibili_subscription_add`）
+- 取消订阅（`bilibili_subscription_remove`）
+- 查看订阅（`bilibili_subscription_list`）
+
+### 对话示例
+
+```
+用户: 帮我订阅"老番茄"
+用户: 把这个UP取消订阅
+用户: 看看我现在订阅了哪些UP
+```
+
 ## ⚙️ 配置项
 
 在 AstrBot 管理面板 → 插件配置中可设置：
@@ -333,6 +351,26 @@ AI automatically continues processing when transcription is done. Transcripts sa
 | `default_count` | `20` | Default search list count |
 | `default_download_count` | `3` | Suggested download count per batch |
 | `search_max_concurrent` | `1` | Concurrent download/transcribe limit |
+
+## 🤖 AI Smart Subscriptions
+
+Besides slash commands, you can simply tell AI what you want to do (subscribe, unsubscribe, list), and it will call the right tools for you.
+
+### Supported Capabilities
+
+- Add subscription (`bilibili_subscription_add`)
+- Remove subscription (`bilibili_subscription_remove`)
+- View subscriptions (`bilibili_subscription_list`, structured output)
+
+### Conversation Examples
+
+```
+User: Subscribe to this creator
+User: Unsubscribe this creator
+User: Show my current subscriptions
+```
+
+> Notes: these tools operate on your current session (group/private chat). `<creator>` supports UID, space link URL, and nickname (nickname can be ambiguous, so UID/link is recommended).
 
 ## ⚙️ Configuration
 
