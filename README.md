@@ -164,6 +164,28 @@ AI 会自动组合使用两个工具：
 | `default_download_count` | `3` | 建议每次下载转写的数量 |
 | `search_max_concurrent` | `1` | 同时下载转写的并发数 |
 
+## 🤖 AI 自然语言订阅管理
+
+除了命令式调用外，现在也支持让 AI 通过工具直接完成订阅管理。
+
+### 支持能力
+
+- 添加订阅（`bilibili_subscription_add`）
+- 取消订阅（`bilibili_subscription_remove`）
+- 查看订阅（`bilibili_subscription_list`，返回结构化列表）
+- 检查更新（`bilibili_subscription_check_updates`）
+
+### 对话示例
+
+```
+用户: 帮我订阅“老番茄”
+用户: 把这个UP取消订阅
+用户: 看看我现在订阅了哪些UP
+用户: 检查一下订阅有没有更新
+```
+
+> 说明：这些工具默认作用于当前会话（当前群/私聊）的订阅集合；`<UP主>` 仍支持 UID、空间链接、昵称（昵称可能重名）。
+
 ## ⚙️ 配置项
 
 在 AstrBot 管理面板 → 插件配置中可设置：
@@ -333,6 +355,28 @@ AI automatically continues processing when transcription is done. Transcripts sa
 | `default_count` | `20` | Default search list count |
 | `default_download_count` | `3` | Suggested download count per batch |
 | `search_max_concurrent` | `1` | Concurrent download/transcribe limit |
+
+## 🤖 AI Natural-Language Subscription Management
+
+In addition to slash commands, subscription management can now be triggered through AI tool calls.
+
+### Supported Capabilities
+
+- Add subscription (`bilibili_subscription_add`)
+- Remove subscription (`bilibili_subscription_remove`)
+- View subscriptions (`bilibili_subscription_list`, structured output)
+- Check updates (`bilibili_subscription_check_updates`)
+
+### Conversation Examples
+
+```
+User: Subscribe to this creator
+User: Unsubscribe this creator
+User: Show my current subscriptions
+User: Check updates for my subscriptions
+```
+
+> Notes: these tools operate on the current session (group/private chat). `<creator>` still supports UID, space link URL, and nickname (nickname may be ambiguous).
 
 ## ⚙️ Configuration
 

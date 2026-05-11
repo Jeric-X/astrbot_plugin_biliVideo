@@ -402,6 +402,149 @@ class BilibiliSearchDownloadTool(FunctionTool[AstrAgentContext]):
                 pass
 
 
+@dataclass
+class BilibiliSubscriptionAddTool(FunctionTool[AstrAgentContext]):
+    """B站订阅添加工具（LLM）"""
+    name: str = "bilibili_subscription_add"
+    description: str = (
+        "为当前会话（当前群或私聊）添加UP主订阅。"
+        "up_input 支持 UID、UP空间链接、UP昵称。"
+        "昵称可能存在重名歧义，建议优先使用 UID 或空间链接。"
+    )
+    parameters: dict = field(
+        default_factory=lambda: {
+            "type": "object",
+            "properties": {
+                "up_input": {
+                    "type": "string",
+                    "description": "UP主标识：UID、UP空间链接或UP昵称",
+                }
+            },
+            "required": ["up_input"],
+        }
+    )
+    plugin_instance: object = None
+
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+        up_input = str(kwargs.get("up_input", "")).strip()
+        if not up_input:
+            return "错误：请提供 up_input（UID、空间链接或UP昵称）"
+
+        try:
+            event = context.context.event
+        except Exception as e:
+            logger.warning(f"[BilibiliSubscriptionAddTool] 获取上下文失败: {e}")
+            return f"错误：获取会话上下文失败 - {e}"
+
+        if not self.plugin_instance._check_access(event):
+            return "⛔ 当前会话无权限使用订阅功能"
+
+        result = await self.plugin_instance._tool_add_subscription(event.unified_msg_origin, up_input)
+        return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@dataclass
+class BilibiliSubscriptionRemoveTool(FunctionTool[AstrAgentContext]):
+    """B站订阅移除工具（LLM）"""
+    name: str = "bilibili_subscription_remove"
+    description: str = (
+        "在当前会话（当前群或私聊）中取消UP主订阅。"
+        "up_input 支持 UID、UP空间链接、UP昵称。"
+    )
+    parameters: dict = field(
+        default_factory=lambda: {
+            "type": "object",
+            "properties": {
+                "up_input": {
+                    "type": "string",
+                    "description": "UP主标识：UID、UP空间链接或UP昵称",
+                }
+            },
+            "required": ["up_input"],
+        }
+    )
+    plugin_instance: object = None
+
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+        up_input = str(kwargs.get("up_input", "")).strip()
+        if not up_input:
+            return "错误：请提供 up_input（UID、空间链接或UP昵称）"
+
+        try:
+            event = context.context.event
+        except Exception as e:
+            logger.warning(f"[BilibiliSubscriptionRemoveTool] 获取上下文失败: {e}")
+            return f"错误：获取会话上下文失败 - {e}"
+
+        if not self.plugin_instance._check_access(event):
+            return "⛔ 当前会话无权限使用订阅功能"
+
+        result = await self.plugin_instance._tool_remove_subscription(event.unified_msg_origin, up_input)
+        return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@dataclass
+class BilibiliSubscriptionListTool(FunctionTool[AstrAgentContext]):
+    """B站订阅列表工具（LLM）"""
+    name: str = "bilibili_subscription_list"
+    description: str = (
+        "查看当前会话（当前群或私聊）的订阅列表，返回结构化数据，便于继续总结与解释。"
+    )
+    parameters: dict = field(
+        default_factory=lambda: {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        }
+    )
+    plugin_instance: object = None
+
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+        try:
+            event = context.context.event
+        except Exception as e:
+            logger.warning(f"[BilibiliSubscriptionListTool] 获取上下文失败: {e}")
+            return f"错误：获取会话上下文失败 - {e}"
+
+        if not self.plugin_instance._check_access(event):
+            return "⛔ 当前会话无权限使用订阅功能"
+
+        result = self.plugin_instance._tool_list_subscriptions(event.unified_msg_origin)
+        return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@dataclass
+class BilibiliSubscriptionCheckTool(FunctionTool[AstrAgentContext]):
+    """B站订阅检查更新工具（LLM）"""
+    name: str = "bilibili_subscription_check_updates"
+    description: str = (
+        "检查当前会话（当前群或私聊）订阅UP主是否有新视频。"
+        "仅执行订阅更新检查，不直接生成视频总结。"
+        "注意：若插件配置了推送目标，自动推送仍按推送目标配置生效。"
+    )
+    parameters: dict = field(
+        default_factory=lambda: {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        }
+    )
+    plugin_instance: object = None
+
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+        try:
+            event = context.context.event
+        except Exception as e:
+            logger.warning(f"[BilibiliSubscriptionCheckTool] 获取上下文失败: {e}")
+            return f"错误：获取会话上下文失败 - {e}"
+
+        if not self.plugin_instance._check_access(event):
+            return "⛔ 当前会话无权限使用订阅功能"
+
+        result = await self.plugin_instance._tool_check_updates(event.unified_msg_origin)
+        return json.dumps(result, ensure_ascii=False, indent=2)
+
+
 class BiliVideoPlugin(Star):
     """BiliVideo 视频总结插件"""
 
@@ -480,9 +623,21 @@ class BiliVideoPlugin(Star):
         # 注册 AI 工具
         self._search_list_tool = BilibiliSearchListTool(plugin_instance=self)
         self._search_download_tool = BilibiliSearchDownloadTool(plugin_instance=self)
+        self._subscription_add_tool = BilibiliSubscriptionAddTool(plugin_instance=self)
+        self._subscription_remove_tool = BilibiliSubscriptionRemoveTool(plugin_instance=self)
+        self._subscription_list_tool = BilibiliSubscriptionListTool(plugin_instance=self)
+        self._subscription_check_tool = BilibiliSubscriptionCheckTool(plugin_instance=self)
         self.context.add_llm_tools(self._search_list_tool)
         self.context.add_llm_tools(self._search_download_tool)
-        self._log("已注册 bilibili_search_list 和 bilibili_search_download 工具供 AI 调用")
+        self.context.add_llm_tools(self._subscription_add_tool)
+        self.context.add_llm_tools(self._subscription_remove_tool)
+        self.context.add_llm_tools(self._subscription_list_tool)
+        self.context.add_llm_tools(self._subscription_check_tool)
+        self._log(
+            "已注册 bilibili_search_list / bilibili_search_download / "
+            "bilibili_subscription_add / bilibili_subscription_remove / "
+            "bilibili_subscription_list / bilibili_subscription_check_updates 工具供 AI 调用"
+        )
 
         if self.bili_login.is_logged_in():
             logger.info("BiliVideo 插件已加载（B站已登录）")
@@ -522,6 +677,206 @@ class BiliVideoPlugin(Star):
         if not text or not text.strip():
             return set()
         return {item.strip() for item in text.split(',') if item.strip()}
+
+    async def _resolve_up_for_subscription(self, up_input: str) -> dict:
+        """解析 UP 输入并获取可用的 mid/name"""
+        up_input = str(up_input or "").strip()
+        if not up_input:
+            return {"ok": False, "error": "请提供UP主UID、空间链接或昵称"}
+
+        search_result = None
+        mid = extract_bilibili_mid(up_input)
+        if not mid:
+            search_result = await search_up_by_name(up_input, cookies=self.bili_cookies)
+            if not search_result:
+                return {
+                    "ok": False,
+                    "error": "无法识别UP主，支持: 纯数字UID、空间链接、或UP主昵称",
+                }
+            mid = search_result["mid"]
+
+        up_info = await get_up_info(mid, cookies=self.bili_cookies)
+        if up_info and up_info.get("name"):
+            return {"ok": True, "mid": mid, "name": up_info["name"]}
+
+        if search_result and search_result.get("name"):
+            return {"ok": True, "mid": mid, "name": search_result["name"]}
+
+        try:
+            videos = await get_latest_videos(mid, count=1, cookies=self.bili_cookies)
+            if videos and videos[0].get("bvid"):
+                vi = await get_video_info(videos[0]["bvid"], cookies=self.bili_cookies)
+                if vi and vi.get("owner_name"):
+                    return {"ok": True, "mid": mid, "name": vi["owner_name"]}
+        except Exception as e:
+            logger.warning(f"解析UP主名称失败 (UID:{mid}): {e}")
+
+        return {"ok": True, "mid": mid, "name": f"UP主_{mid}"}
+
+    async def _resolve_up_mid_only(self, up_input: str) -> dict:
+        """仅解析 mid（用于取消订阅）"""
+        up_input = str(up_input or "").strip()
+        if not up_input:
+            return {"ok": False, "error": "请提供UP主UID、空间链接或昵称"}
+
+        mid = extract_bilibili_mid(up_input)
+        if mid:
+            return {"ok": True, "mid": mid}
+
+        search_result = await search_up_by_name(up_input, cookies=self.bili_cookies)
+        if search_result and search_result.get("mid"):
+            return {"ok": True, "mid": search_result["mid"], "name": search_result.get("name", "")}
+
+        return {
+            "ok": False,
+            "error": "无法识别UP主，支持: 纯数字UID、空间链接、或UP主昵称",
+        }
+
+    async def _tool_add_subscription(self, origin: str, up_input: str) -> dict:
+        max_subs = self.config.get("max_subscriptions", 20)
+        current_count = self.subscription_mgr.get_subscription_count(origin)
+        if current_count >= max_subs:
+            return {
+                "ok": False,
+                "code": "limit_exceeded",
+                "message": f"已达到最大订阅数 ({max_subs})",
+                "max_subscriptions": max_subs,
+                "current_subscriptions": current_count,
+            }
+
+        resolved = await self._resolve_up_for_subscription(up_input)
+        if not resolved.get("ok"):
+            return {
+                "ok": False,
+                "code": "invalid_up_input",
+                "message": resolved.get("error", "无法识别UP主"),
+                "up_input": up_input,
+            }
+
+        mid = resolved["mid"]
+        name = resolved["name"]
+        success = self.subscription_mgr.add_subscription(origin, mid, name)
+        if not success:
+            return {
+                "ok": True,
+                "code": "already_subscribed",
+                "message": f"已经订阅了 UP主【{name}】(UID:{mid})",
+                "origin": origin,
+                "subscription": {"mid": mid, "name": name},
+            }
+
+        videos = await get_latest_videos(mid, count=1, cookies=self.bili_cookies)
+        if videos and videos[0].get("bvid"):
+            self.subscription_mgr.update_last_video(origin, mid, videos[0]["bvid"])
+
+        return {
+            "ok": True,
+            "code": "subscribed",
+            "message": f"已订阅 UP主【{name}】(UID:{mid})",
+            "origin": origin,
+            "subscription": {"mid": mid, "name": name},
+        }
+
+    async def _tool_remove_subscription(self, origin: str, up_input: str) -> dict:
+        resolved = await self._resolve_up_mid_only(up_input)
+        if not resolved.get("ok"):
+            return {
+                "ok": False,
+                "code": "invalid_up_input",
+                "message": resolved.get("error", "无法识别UP主"),
+                "up_input": up_input,
+            }
+
+        mid = resolved["mid"]
+        success = self.subscription_mgr.remove_subscription(origin, mid)
+        if success:
+            return {
+                "ok": True,
+                "code": "unsubscribed",
+                "message": f"已取消订阅 (UID:{mid})",
+                "origin": origin,
+                "subscription": {"mid": mid},
+            }
+
+        return {
+            "ok": True,
+            "code": "not_found",
+            "message": f"未找到该订阅 (UID:{mid})",
+            "origin": origin,
+            "subscription": {"mid": mid},
+        }
+
+    def _tool_list_subscriptions(self, origin: str) -> dict:
+        subs = self.subscription_mgr.get_subscriptions(origin)
+        return {
+            "ok": True,
+            "origin": origin,
+            "total": len(subs),
+            "subscriptions": [
+                {
+                    "index": i,
+                    "mid": up.get("mid", ""),
+                    "name": up.get("name", ""),
+                    "last_bvid": up.get("last_bvid", ""),
+                }
+                for i, up in enumerate(subs, 1)
+            ],
+            "message": "当前没有订阅任何UP主" if not subs else f"当前共有 {len(subs)} 个订阅",
+        }
+
+    async def _tool_check_updates(self, origin: str) -> dict:
+        subs = self.subscription_mgr.get_subscriptions(origin)
+        if not subs:
+            return {
+                "ok": True,
+                "origin": origin,
+                "checked": 0,
+                "new_videos_count": 0,
+                "new_videos": [],
+                "message": "当前没有订阅任何UP主，无法检查更新",
+            }
+
+        new_videos = []
+        initialized_count = 0
+        for up in subs:
+            try:
+                mid = up["mid"]
+                last_bvid = up.get("last_bvid", "")
+                videos = await get_latest_videos(mid, count=1, cookies=self.bili_cookies)
+                if not videos:
+                    continue
+                latest = videos[0]
+                latest_bvid = latest["bvid"]
+                if latest_bvid == last_bvid:
+                    continue
+                if not last_bvid:
+                    self.subscription_mgr.update_last_video(origin, mid, latest_bvid)
+                    initialized_count += 1
+                    continue
+
+                self.subscription_mgr.update_last_video(origin, mid, latest_bvid)
+                new_videos.append(
+                    {
+                        "mid": mid,
+                        "up_name": up.get("name", ""),
+                        "bvid": latest_bvid,
+                        "title": latest.get("title", ""),
+                        "url": f"https://www.bilibili.com/video/{latest_bvid}",
+                    }
+                )
+                await asyncio.sleep(1)
+            except Exception as e:
+                logger.error(f"LLM 检查UP主 {up.get('name', '?')} 失败: {e}")
+
+        return {
+            "ok": True,
+            "origin": origin,
+            "checked": len(subs),
+            "initialized_count": initialized_count,
+            "new_videos_count": len(new_videos),
+            "new_videos": new_videos,
+            "message": "检查完成，所有订阅的UP主暂无新视频" if not new_videos else f"检查完成，共发现 {len(new_videos)} 个新视频",
+        }
 
     def _check_access(self, event: AstrMessageEvent) -> bool:
         """检查群是否有权使用插件（仅群维度，不看个人）"""
