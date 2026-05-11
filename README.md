@@ -164,9 +164,9 @@ AI 会自动组合使用两个工具：
 | `default_download_count` | `3` | 建议每次下载转写的数量 |
 | `search_max_concurrent` | `1` | 同时下载转写的并发数 |
 
-## 🤖 AI 自然语言订阅管理
+## 🤖 AI 智能订阅
 
-除了命令式调用外，现在也支持让 AI 通过工具直接完成订阅管理。
+除了命令式命令，你还可以直接告诉 AI 你想“订阅谁、取消谁、查看列表、检查更新”，AI 会自动调用对应工具帮你完成。
 
 ### 支持能力
 
@@ -184,7 +184,7 @@ AI 会自动组合使用两个工具：
 用户: 检查一下订阅有没有更新
 ```
 
-> 说明：这些工具默认作用于当前会话（当前群/私聊）的订阅集合；`<UP主>` 仍支持 UID、空间链接、昵称（昵称可能重名）。
+> 说明：这些工具默认作用于你当前会话（当前群/私聊）的订阅集合；`<UP主>` 支持 UID、空间链接、昵称（昵称可能重名，建议优先 UID/链接）。
 
 ## ⚙️ 配置项
 
@@ -356,9 +356,9 @@ AI automatically continues processing when transcription is done. Transcripts sa
 | `default_download_count` | `3` | Suggested download count per batch |
 | `search_max_concurrent` | `1` | Concurrent download/transcribe limit |
 
-## 🤖 AI Natural-Language Subscription Management
+## 🤖 AI Smart Subscriptions
 
-In addition to slash commands, subscription management can now be triggered through AI tool calls.
+Besides slash commands, you can simply tell AI what you want to do (subscribe, unsubscribe, list, or check updates), and it will call the right tools for you.
 
 ### Supported Capabilities
 
@@ -376,7 +376,7 @@ User: Show my current subscriptions
 User: Check updates for my subscriptions
 ```
 
-> Notes: these tools operate on the current session (group/private chat). `<creator>` still supports UID, space link URL, and nickname (nickname may be ambiguous).
+> Notes: these tools operate on your current session (group/private chat). `<creator>` supports UID, space link URL, and nickname (nickname can be ambiguous, so UID/link is recommended).
 
 ## ⚙️ Configuration
 
