@@ -427,16 +427,40 @@ class BilibiliVideoSummaryTool(FunctionTool[AstrAgentContext]):
     async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
         video_input = str(kwargs.get("video_input", "")).strip()
         if not video_input:
-            return "错误：请提供 video_input（B站链接、b23短链或BV号）"
+            return json.dumps(
+                {
+                    "ok": False,
+                    "code": "invalid_video_input",
+                    "message": "请提供 video_input（B站链接、b23短链或BV号）",
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
 
         try:
             event = context.context.event
         except Exception as e:
             logger.warning(f"[BilibiliVideoSummaryTool] 获取上下文失败: {e}")
-            return f"错误：获取会话上下文失败 - {e}"
+            return json.dumps(
+                {
+                    "ok": False,
+                    "code": "context_error",
+                    "message": f"获取会话上下文失败 - {e}",
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
 
         if not self.plugin_instance._check_access(event):
-            return "⛔ 当前会话无权限使用总结功能"
+            return json.dumps(
+                {
+                    "ok": False,
+                    "code": "access_denied",
+                    "message": "当前会话无权限使用总结功能",
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
 
         result = await self.plugin_instance._tool_generate_summary(video_input)
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -929,7 +953,7 @@ class BiliVideoPlugin(Star):
         args = self._parse_args(raw_msg)
         if args:
             first_arg = args.split()[0]
-            if 'bilibili.com' in first_arg or 'b23.tv' in first_arg:
+            if detect_platform(first_arg) == "bilibili" or re.search(r'^https?://b23\.tv/\S+$', first_arg):
                 video_url = first_arg
 
         if not video_url:
