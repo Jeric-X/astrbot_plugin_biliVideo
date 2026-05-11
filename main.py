@@ -950,12 +950,6 @@ class BiliVideoPlugin(Star):
         full_text = full_text or raw_msg
         video_url = ""
 
-        args = self._parse_args(raw_msg)
-        if args:
-            first_arg = args.split()[0]
-            if detect_platform(first_arg) == "bilibili" or re.search(r'^https?://b23\.tv/\S+$', first_arg):
-                video_url = first_arg
-
         if not video_url:
             url_match = re.search(
                 r'https?://(?:www\.)?bilibili\.com/video/[A-Za-z0-9/?=&_.]+',
@@ -1007,8 +1001,7 @@ class BiliVideoPlugin(Star):
                 "message": "请提供 video_input（B站链接、b23短链或BV号）",
             }
 
-        raw_msg = f"/总结 {video_input}"
-        video_url = self._extract_summary_video_url(raw_msg, video_input)
+        video_url = self._extract_summary_video_url(video_input, video_input)
         if not video_url:
             return {
                 "ok": False,
