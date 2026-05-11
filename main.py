@@ -1728,10 +1728,7 @@ class BiliVideoPlugin(Star):
 
         found_new = 0
 
-        # send_callback 是 async generator，需要特殊处理
-        # 改用直接迭代方式
-        subs_copy = list(subs)
-        for up in subs_copy:
+        for up in subs:
             try:
                 mid = up["mid"]
                 last_bvid = up.get("last_bvid", "")
