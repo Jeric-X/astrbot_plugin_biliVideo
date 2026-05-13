@@ -2160,7 +2160,7 @@ class BiliVideoPlugin(Star):
         video_url = f"https://www.bilibili.com/video/{latest_bvid}"
         push_header = f"🔔 UP主【{up['name']}】发布了新视频!\n"
 
-        if self.config.get("auto_push_info_only", False):
+        if not self.config.get("auto_push_summary", True):
             # 仅推送视频基本信息，不进行转写和 LLM 总结
             import time as _time
             lines = [push_header + f"📺 {latest['title']}"]
